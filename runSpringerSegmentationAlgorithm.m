@@ -60,11 +60,10 @@ assigned_states = expand_qt(qt, featuresFs, Fs, length(audio_data));
 if(figures)
    figure('Name','Derived state sequence');
    t1 = (1:length(audio_data))./Fs;
-   plot(t1,audio_data,'k');
+   plot(t1,normalise_signal(audio_data),'k');
    hold on;
    plot(t1,assigned_states,'r--');
    legend('Audio data', 'Derived states');
-   pause();
 end
 
 

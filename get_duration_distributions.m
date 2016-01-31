@@ -86,7 +86,6 @@ max_diastole = mean_diastole + 3*std_diastole;
 
 
 
-
 %Setting the Min and Max values for the S1 and S2 sounds:
 %If the minimum lengths are less than a 50th of the sampling frequency, set
 %to a 50th of the sampling frequency:

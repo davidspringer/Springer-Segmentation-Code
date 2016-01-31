@@ -36,3 +36,12 @@ for PCGi = 1:numPCGs
 end
 
 
+%% Run with MIT data:
+
+[test_example original_fs] = audioread('/Users/davidspringer/Downloads/training_a/a0111.wav');
+
+test_example = resample(test_example,1000,original_fs);
+[assigned_states] = runSpringerSegmentationAlgorithm(test_example, springer_options.audio_Fs, B_matrix, pi_vector, total_obs_distribution, true);
+pause();
+
+

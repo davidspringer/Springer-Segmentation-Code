@@ -1,4 +1,4 @@
-% function [heartRate systolicTimeInterval] = getHeartRateSchmidt(audio_data, Fs)
+% function [heartRate systolicTimeInterval] = getHeartRateSchmidt(audio_data, Fs, figures)
 %
 % Derive the heart rate and the sytolic time interval from a PCG recording.
 % This is used in the duration-dependant HMM-based segmentation of the PCG
@@ -19,6 +19,7 @@
 %% INPUTS:
 % audio_data: The raw audio data from the PCG recording
 % Fs: the sampling frequency of the audio recording
+% figures: optional boolean to display figures
 %
 %% OUTPUTS:
 % heartRate: the heart rate of the PCG in beats per minute
@@ -41,7 +42,11 @@
 % You should have received a copy of the GNU General Public License
 % along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-function [heartRate, systolicTimeInterval] = getHeartRateSchmidt(audio_data, Fs)
+function [heartRate, systolicTimeInterval] = getHeartRateSchmidt(audio_data, Fs, figures)
+
+if nargin < 3
+    figures = false;
+end
 
 %% Get heatrate:
 % From Schmidt:
@@ -85,5 +90,16 @@ min_sys_duration = round(0.2*Fs);
 
 [~, pos] = max(signal_autocorrelation(min_sys_duration:max_sys_duration));
 systolicTimeInterval = (min_sys_duration+pos)/Fs;
+
+
+if(figures)
+    figure('Name', 'Heart rate calculation figure');
+    plot(signal_autocorrelation);
+    hold on;
+    plot(true_index, signal_autocorrelation(true_index),'ro');
+    plot((min_sys_duration+pos), signal_autocorrelation((min_sys_duration+pos)), 'mo');
+    xlabel('Samples');
+    legend('Autocorrelation', 'Position of max peak used to calculate HR', 'Position of max peak within systolic interval');
+end
 
 

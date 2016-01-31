@@ -1,9 +1,9 @@
-% function [delta, psi, qt] = viterbiDecodePCG_Springer(observation_sequence, pi_vector, b_matrix, total_obs_distribution, heartrate, systolic_time, Fs)
+% function [delta, psi, qt] = viterbiDecodePCG_Springer(observation_sequence, pi_vector, b_matrix, total_obs_distribution, heartrate, systolic_time, Fs, figures)
 %
 % This function calculates the delta, psi and qt matrices associated with
 % the Viterbi decoding algorithm from:
 % L. R. Rabiner, "A tutorial on hidden Markov models and selected
-% applications in speech recognition," Proc. IEEE, vol. 77, no. 2, pp. 
+% applications in speech recognition," Proc. IEEE, vol. 77, no. 2, pp.
 % 257-286, Feb. 1989.
 % using equations 32a - 35, and equations 68 - 69 to include duration
 % dependancy of the states.
@@ -33,6 +33,7 @@
 % systolic_time: the duration of systole, extracted using
 % "getHeartRateSchmidt"
 % Fs: the sampling frequency of the observation_sequence
+% figures: optional boolean variable to show figures
 %
 %% Outputs:
 % logistic_regression_B_matrix:
@@ -58,8 +59,11 @@
 % You should have received a copy of the GNU General Public License
 % along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-function [delta, psi, qt] = viterbiDecodePCG_Springer(observation_sequence, pi_vector, b_matrix, total_obs_distribution, heartrate, systolic_time, Fs)
+function [delta, psi, qt] = viterbiDecodePCG_Springer(observation_sequence, pi_vector, b_matrix, total_obs_distribution, heartrate, systolic_time, Fs,figures)
 
+if nargin < 8
+    figures = false;
+end
 
 %% Preliminary
 springer_options = default_Springer_HSMM_options;
@@ -69,8 +73,7 @@ N = 4; % Number of states
 
 % Setting the maximum duration of a single state. This is set to an entire
 % heart cycle:
-max_duration_D = round((1*heartrate/60)*Fs);
-
+max_duration_D = round((1*(60/heartrate))*Fs);
 
 %Initialising the variables that are needed to find the optimal state path along
 %the observation sequence.
@@ -104,34 +107,33 @@ for n = 1:N
     pihat = mnrval(cell2mat(b_matrix(n)),observation_sequence(:,:));
     
     for t = 1:T
-           
+        
         Po_correction = mvnpdf(observation_sequence(t,:),cell2mat(total_obs_distribution(1)),cell2mat(total_obs_distribution(2)));
         
         %When saving the coefficients from the logistic
         %regression, it orders them P(class 1) then P(class 2). When
         %training, I label the classes as 0 and 1, so the
         %correct probability would be pihat(2).
-
+        
         observation_probs(t,n) = (pihat(t,2)*Po_correction)/pi_vector(n);
-
+        
     end
 end
-
 
 %% Setting up state duration probabilities, using Gaussian distributions:
 [d_distributions, max_S1, min_S1, max_S2, min_S2, max_systole, min_systole, max_diastole, min_diastole] = get_duration_distributions(heartrate,systolic_time);
 
 
 
-duration_probs = zeros(N,150);
-
+duration_probs = zeros(N,3*Fs);
+duration_sum = zeros(N,1);
 for state_j = 1:N
     for d = 1:max_duration_D
         if(state_j == 1)
             duration_probs(state_j,d) = mvnpdf(d,cell2mat(d_distributions(state_j,1)),cell2mat(d_distributions(state_j,2)));
             
             if(d < min_S1 || d > max_S1)
-                duration_probs(state_j,d)= 0;
+                duration_probs(state_j,d)= realmin;
             end
             
             
@@ -139,7 +141,7 @@ for state_j = 1:N
             duration_probs(state_j,d) = mvnpdf(d,cell2mat(d_distributions(state_j,1)),cell2mat(d_distributions(state_j,2)));
             
             if(d < min_S2 || d > max_S2)
-                duration_probs(state_j,d)= 0;
+                duration_probs(state_j,d)= realmin;
             end
             
             
@@ -148,7 +150,7 @@ for state_j = 1:N
             duration_probs(state_j,d) = mvnpdf(d,cell2mat(d_distributions(state_j,1)),cell2mat(d_distributions(state_j,2)));
             
             if(d < min_systole|| d > max_systole)
-                duration_probs(state_j,d)= 0;
+                duration_probs(state_j,d)= realmin;
             end
             
             
@@ -157,7 +159,7 @@ for state_j = 1:N
             duration_probs(state_j,d) = mvnpdf(d,cell2mat(d_distributions(state_j,1)),cell2mat(d_distributions(state_j,2)));
             
             if(d < min_diastole ||d > max_diastole)
-                duration_probs(state_j,d)= 0;
+                duration_probs(state_j,d)= realmin;
             end
         end
     end
@@ -165,10 +167,23 @@ for state_j = 1:N
 end
 
 
-if(length(duration_probs)>150)
-    duration_probs(:,151:end) = [];
+if(length(duration_probs)>3*Fs)
+    duration_probs(:,(3*Fs+1):end) = [];
 end
 
+if(figures)
+    figure('Name', 'Duration probabilities');
+    plot(duration_probs(1,:)./ duration_sum(1),'Linewidth',2);
+    hold on;
+    plot(duration_probs(2,:)./ duration_sum(2),'r','Linewidth',2);
+    hold on;
+    plot(duration_probs(3,:)./ duration_sum(3),'g','Linewidth',2);
+    hold on;
+    plot(duration_probs(4,:)./ duration_sum(4),'k','Linewidth',2);
+    hold on;
+    legend('S1 Duration','Systolic Duration','S2 Duration','Diastolic Duration');
+    pause();
+end
 %% Perform the actual Viterbi Recursion:
 
 
@@ -202,7 +217,7 @@ if(springer_options.use_mex)
     % Ensure you have run the mex viterbi_PhysChallenge.c code on the
     % native machine before running this:
     
-    [delta psi psi_duration] = viterbi_Springer(N,T,a_matrix,max_duration_D,delta,observation_probs,duration_probs,psi);
+    [delta, psi, psi_duration] = viterbi_Springer(N,T,a_matrix,max_duration_D,delta,observation_probs,duration_probs,psi);
     
 else
     
@@ -223,7 +238,7 @@ else
     % systole, and can lead to labelling errors.
     
     % t spans input 2 to T + max_duration_D:
-
+    
     
     for t = 2:T+ max_duration_D-1
         for j = 1:N
@@ -255,20 +270,12 @@ else
                 end
                 
                 
-                
-                % The duration of the window we are considering. This is used
-                % for the psi variable later.
-                duration = end_t -start_t;
-                
-                
                 %Find the max_delta and index of that from the previous step
                 %and the transition to the current step:
                 %This is the first half of the expression of equation 33a from
                 %Rabiner:
                 
-                
                 [max_delta, max_index] = max(delta(start_t,:)+log(a_matrix(:,j))');
-                
                 
                 %  The above line can be written as:
                 % [max_delta, max_index] = max([ delta(1,start_t)+log(transitionProbs(1,j)) delta(2,start_t)+log(transitionProbs(2,j)) delta(3,start_t)+log(transitionProbs(3,j)) delta(4,start_t)+log(transitionProbs(4,j))]);
@@ -279,10 +286,10 @@ else
                 %analysis window:
                 probs = prod(observation_probs(start_t:end_t,j));
                 
-               
+                
                 %Find the normalised probabilities of the observations at only
                 %the time point at the start of the time window:
-                 
+                
                 if(probs ==0)
                     probs = realmin;
                 end
@@ -306,7 +313,7 @@ else
                 
                 delta_temp = max_delta + (emission_probs)+ log((duration_probs(j,d)./duration_sum(j)));
                 
-                
+              
                 %Unlike equation 33a from Rabiner, the maximum delta could come
                 %from multiple d values, or from multiple size of the analysis
                 %window. Therefore, only keep the maximum delta value over the
@@ -331,8 +338,8 @@ end
 % Find just the delta after the end of the actual signal
 temp_delta = delta(T+1:end,:);
 %Find the maximum value in this section, and which state it is in:
-[maxVal, idx] = max(temp_delta(:));
-[pos, max_state] = ind2sub(size(temp_delta), idx);
+[~, idx] = max(temp_delta(:));
+[pos, ~] = ind2sub(size(temp_delta), idx);
 
 % Change this position to the real position in delta matrix:
 pos = pos+T;
@@ -351,10 +358,10 @@ pos = pos+T;
 %state to the q_t variable.
 
 %1)
-[val state] = max(delta(pos,:),[],2);
+[~, state] = max(delta(pos,:),[],2);
 
 %2)
-offset = pos
+offset = pos;
 preceding_state = psi(offset,state);
 
 %3)
