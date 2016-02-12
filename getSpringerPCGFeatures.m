@@ -93,7 +93,7 @@ if(include_wavelet)
     
     [cD, cA] = getDWT(audio_data,wavelet_level,wavelet_name);
     
-    wavelet_feature = abs(cD(lev,:));
+    wavelet_feature = abs(cD(wavelet_level,:));
     wavelet_feature = wavelet_feature(1:length(homomorphic_envelope));
     downsampled_wavelet = resample(wavelet_feature, featuresFs, Fs);
     downsampled_wavelet =  normalise_signal(downsampled_wavelet)';
