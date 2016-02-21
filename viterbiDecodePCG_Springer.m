@@ -87,12 +87,12 @@ delta = ones(T+ max_duration_D-1,N)*-inf;
 %The argument that maximises the transition between states (this is
 %basically the previous state that had the highest transition probability
 %to the current state) is tracked using the psi variable.
-psi = zeros(T,N);
+psi = zeros(T+ max_duration_D-1,N);
 
 %An additional variable, that is not included on page 264 or Rabiner, is
 %the state duration that maximises the delta variable. This is essential
 %for the duration dependant HMM.
-psi_duration =zeros(T,N);
+psi_duration =zeros(T + max_duration_D-1,N);
 
 %% Setting up observation probs
 observation_probs = zeros(T,N);
@@ -216,8 +216,8 @@ if(springer_options.use_mex)
     %% Run Mex code
     % Ensure you have run the mex viterbi_PhysChallenge.c code on the
     % native machine before running this:
+    [delta, psi, psi_duration] = viterbi_Springer(N,T,a_matrix,max_duration_D,delta,observation_probs,duration_probs,psi, duration_sum);
     
-    [delta, psi, psi_duration] = viterbi_Springer(N,T,a_matrix,max_duration_D,delta,observation_probs,duration_probs,psi);
     
 else
     
@@ -242,7 +242,8 @@ else
     
     for t = 2:T+ max_duration_D-1
         for j = 1:N
-            for d = 1:max_duration_D
+            for d = 1:1:max_duration_D
+                
                 
                 %The start of the analysis window, which is the current time
                 %step, minus d (the time horizon we are currently looking back),
@@ -274,13 +275,8 @@ else
                 %and the transition to the current step:
                 %This is the first half of the expression of equation 33a from
                 %Rabiner:
-                
                 [max_delta, max_index] = max(delta(start_t,:)+log(a_matrix(:,j))');
-                
-                %  The above line can be written as:
-                % [max_delta, max_index] = max([ delta(1,start_t)+log(transitionProbs(1,j)) delta(2,start_t)+log(transitionProbs(2,j)) delta(3,start_t)+log(transitionProbs(3,j)) delta(4,start_t)+log(transitionProbs(4,j))]);
-                % if you need to convert to .mex code
-                
+                               
                 
                 %Find the normalised probabilities of the observations over the
                 %analysis window:
@@ -310,25 +306,29 @@ else
                 %state to this one, with the observations and being in the same
                 %state for the analysis window. This is the duration-dependant
                 %variation of equation 33a from Rabiner:
-                
+                %                 fprintf('log((duration_probs(j,d)./duration_sum(j))):%d\n',log((duration_probs(j,d)./duration_sum(j))));
                 delta_temp = max_delta + (emission_probs)+ log((duration_probs(j,d)./duration_sum(j)));
                 
-              
+                
                 %Unlike equation 33a from Rabiner, the maximum delta could come
                 %from multiple d values, or from multiple size of the analysis
                 %window. Therefore, only keep the maximum delta value over the
                 %entire analysis window:
                 %If this probability is greater than the last greatest,
                 %update the delta matrix and the time duration variable:
+                
+                
                 if(delta_temp>delta(t,j))
                     delta(t,j) = delta_temp;
                     psi(t,j) = max_index;
                     psi_duration(t,j) = d;
                 end
+                
             end
         end
     end
 end
+
 
 %% Termination
 

@@ -61,12 +61,15 @@ void viterbi(
         double *observation_probs,
         double duration_probs [4][150],
         double *psi,
-        double *psi_duration_out
+        double *psi_duration_out,
+        double duration_sum_in[4]
         )
         
 {
     
     int i;
+    int i2;
+    int i3;
     int j;
     int t;
     int d;
@@ -75,20 +78,21 @@ void viterbi(
     
     for (t = 1; t<T+ max_duration_D-1;t++){
         
+        
         /*For each state */
-        for (j = 0; j<N;j++){
+        for (j = 0; j<4;j++){
+            
             double emission_probs = 0;
             
             /*        max_duration_D*/
-            for (d = 1; d<max_duration_D; d++){
+            for (d = 1; d<=max_duration_D; d++){
+                
                 int start; int max_index = 0;
                 int end_t = 0;
-                int duration = 0;
-                double probs = 0;
-                double duration_sum = 0;
-                double delta_temp = 0;
-                double max_delta = -1*DBL_MAX ;
-                
+                float probs = 0;
+                float duration_sum = 0;
+                float delta_temp = 0;
+                float max_delta = -1*DBL_MAX;
                 
                 
                 /*  Get the maximum value for delta at this t, and record the state where it was found:
@@ -109,8 +113,8 @@ void viterbi(
                     start = 0;
                 }
                 
-                if(start > T-1){
-                    start = T-1;
+                if(start > T-2){
+                    start = T-2;
                 }
                 
                 /*
@@ -123,28 +127,19 @@ void viterbi(
                  */
                 
                 end_t = t;
-                if(end_t>T){
-                    end_t = T;
+                if(end_t>T-1){
+                    end_t = T-1;
                 }
-                
-                duration = end_t -start;
-                
-                
                 
                 
                 for(i = 0; i<N; i++)
                 {
-                    double temp = delta[t-(d) +i*T] + log(a_matrix[i][j]);
-                    
-                    
-                    
+                    double temp = delta[(start) +(i*(T+ max_duration_D-1))] + log(a_matrix[i][j]);
                     if(temp > max_delta){
                         max_delta = temp;
                         max_index = i;
                     }
                 }
-                
-                
                 
                 
                 /*//Find the normaliser for the observations at the start of the
@@ -154,70 +149,37 @@ void viterbi(
                  * //find the observation probabilities for one time step, each
                  * //time d is updated:*/
                 
-                for(i = 0; i<N; i++)
-                {
-                    if(observation_probs[start +i*T] == 0){
-                        observation_probs[start +i*T] = DBL_MIN;
-                    }
-                }
                 
                 probs = 0;
-                for(i = start; i<end_t; i++){
-                    probs = probs + log(observation_probs[i +j*T]);
+                for(i2 = start; i2<=end_t; i2++){
+                    probs = probs + log(observation_probs[i2 +j*T]);
                 }
-                
-                
                 if(probs == 0){
                     probs = DBL_MIN;
                 }
-                
-                
                 emission_probs = (probs);
-                
-                
-//                     if(t<5){
-//                         mexPrintf ("emission_probs:%f \n",emission_probs);
-//                     }
-                
-                
-                
-                /*Find the normaliser for the duration probablities, being the sum across all allowed times in each state:*/
-                for(i = 0; i<max_duration_D; i++)
-                {
-                    if (isnan(duration_probs[j][i])) {
-                        
-                    }
-                    else{
-                        duration_sum = duration_sum + duration_probs[j][i];
-                    }
-                    
-                    
-                }
-                
-                
                 
                 /*Find the total probability of transitioning from the last
                  * //state to this one, with the observations and being in the same
                  * //state for the analysis window. This is the duration-dependant
                  * //variation of equation 33a from Rabiner:*/
-                delta_temp = max_delta + (emission_probs)+ (log((duration_probs[j][d]/duration_sum)));
-                
-                
-//                     if(t<5){
-//                         mexPrintf ("max_delta: %f \n",max_delta);
-//
-//                         mexPrintf ("emission_probs: %f \n",emission_probs);
-//                         mexPrintf ("duration_probs[j][d]: %f \n",duration_probs[j][d]);
-//                         mexPrintf ("duration_sum: %f \n",duration_sum);
-//
-//                         mexPrintf ("log((duration_probs[j][d]/duration_sum)): %f \n",log((duration_probs[j][d]/duration_sum)));
-//
-//                         mexPrintf ("delta_temp: %f \n",delta_temp);
-//
-//                     }
+                delta_temp = max_delta + (emission_probs)+ (log((duration_probs[j][d-1]/duration_sum_in[j])));
                 
                 
                 
+                // Uncomment the below for debuggin:
+//                     mexPrintf("\n t:%d", t);
+//                     mexPrintf("\n j:%d", j);
+//                     mexPrintf("\n d:%d", d);
+//                     mexPrintf("\n max_delta:%f", max_delta);
+//                     mexPrintf("\n max_index:%i \n", max_index);
+//                     mexPrintf ("emission_probs: %f \n",emission_probs);
+//                     mexPrintf ("log((duration_probs[j][d-1]/duration_sum)): %f \n",log((duration_probs[j][d-1]/duration_sum_in[j])));
+//                     mexPrintf ("delta_temp: %f \n",delta_temp);
+//                     mexPrintf ("delta[t+j*(T+ max_duration_D-1)]: %f \n",delta[t+j*(T+ max_duration_D-1)]);
+//                     mexPrintf ("duration_probs[j][d]: %f \n",duration_probs[j][d]);
+//                     mexPrintf ("duration_sum_in[j]: %f \n",duration_sum_in[j]);
+                  
                 /*
                  * Unlike equation 33a from Rabiner, the maximum delta could come
                  * from multiple d values, or from multiple size of the analysis
@@ -227,19 +189,12 @@ void viterbi(
                  * update the delta matrix and the time duration variable:
                  */
                 
-                
-                
-                
-//                     mexPrintf ("delta_temp: %f \n",delta_temp);
-//
-//                     mexPrintf ("delta_temp>delta?: %d \n",delta_temp>delta[t+j*T]);
-                
-                if(delta_temp>delta[t+j*T]){
+                if(delta_temp>delta[t+j*(T+ max_duration_D-1)]){
                     
-                    delta[t+j*T] = delta_temp;
-                    psi[t+j*T] = max_index+1;
+                    delta[t+j*(T+ max_duration_D-1)] = delta_temp;
+                    psi[t+j*(T+ max_duration_D-1)] = max_index+1;
                     
-                    psi_duration_out[t + j*T] = d;
+                    psi_duration_out[t + j*(T+ max_duration_D-1)] = d;
                     
                 }
             }
@@ -275,6 +230,7 @@ void viterbi(
 #define observation_probs prhs[5]
 #define duration_probs prhs[6]
 #define psi prhs[7]
+#define duration_sum prhs[8]
 
 
 #define delta_out plhs[0]
@@ -293,6 +249,7 @@ void mexFunction(
     double *delta_in_matrix;/* 2 dimensional C array to pass to workFcn() */
     double *observation_probs_matrix;/* 2 dimensional C array to pass to workFcn() */
     double *psi_matrix;/* 2 dimensional C array to pass to workFcn() */
+    double duration_sum_in[4];/* 2 dimensional C array to pass to workFcn() */
     
     double duration_probs_matrix[4][150];/* 2 dimensional C array to pass to workFcn() */
     
@@ -311,16 +268,16 @@ void mexFunction(
         mexErrMsgTxt("mexample requires 3 output argument.");
     
     /*   Step 1b: is nrhs 2? */
-    if (nrhs!=8)
-        mexErrMsgTxt("mexample requires 8 input arguments");
+    if (nrhs!=9)
+        mexErrMsgTxt("mexample requires 9 input arguments");
     
     
     actual_T = mxGetM(observation_probs);
     actual_N = mxGetN(observation_probs);
     
     max_duration_D_val = mxGetScalar(max_duration_D);
-
-        
+    
+    
     /*   Step 2:  Allocate memory for return argument(s) */
     delta_out = mxCreateDoubleMatrix((actual_T+max_duration_D_val-1), actual_N, mxREAL);
     psi_out = mxCreateDoubleMatrix((actual_T+max_duration_D_val-1), actual_N, mxREAL);
@@ -340,6 +297,12 @@ void mexFunction(
         }
     }
     
+    for (col=0; col < mxGetM(duration_sum); col++){
+        duration_sum_in[col] =(mxGetPr(duration_sum))[col];
+    }
+    
+    
+    
     
     delta_in_matrix = mxGetPr(delta);
     observation_probs_matrix = mxGetPr(observation_probs);
@@ -358,7 +321,6 @@ void mexFunction(
     for (col=0; col < mxGetN(duration_probs); col++){
         for (row=0; row < mxGetM(duration_probs); row++){
             duration_probs_matrix[row][col] =(mxGetPr(duration_probs))[row+col*mxGetM(duration_probs)];
-            
         }
     }
     
@@ -370,8 +332,8 @@ void mexFunction(
      * dimensional array mentioned in the previous comment.  */
     
     /*   Step 4:  Call workFcn function */
-    viterbi(actual_N,actual_T,a_matrix_in,max_duration_D_val,delta_in_matrix,observation_probs_matrix,duration_probs_matrix,psi_matrix,mxGetPr(psi_duration));
-    memcpy ( mxGetPr(delta_out), delta_in_matrix, actual_N*actual_T*8);
-    memcpy ( mxGetPr(psi_out), psi_matrix, actual_N*actual_T*8);
+    viterbi(actual_N,actual_T,a_matrix_in,max_duration_D_val,delta_in_matrix,observation_probs_matrix,duration_probs_matrix,psi_matrix,mxGetPr(psi_duration),duration_sum_in);
+    memcpy ( mxGetPr(delta_out), delta_in_matrix, actual_N*(actual_T+max_duration_D_val-1)*8);
+    memcpy ( mxGetPr(psi_out), psi_matrix, actual_N*(actual_T+max_duration_D_val-1)*8);
     
 }
