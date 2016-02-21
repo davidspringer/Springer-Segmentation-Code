@@ -66,12 +66,12 @@ audio_data = schmidt_spike_removal(audio_data,Fs);
 homomorphic_envelope = Homomorphic_Envelope_with_Hilbert(audio_data, Fs);
 
 %% Find the autocorrelation:
-
-signal_autocorrelation = autocorr(homomorphic_envelope,length(homomorphic_envelope)-1, [] , 2);
+y=homomorphic_envelope-mean(homomorphic_envelope);
+[c] = xcorr(y,'coeff');
+signal_autocorrelation = c(length(homomorphic_envelope)+1:end);
 
 min_index = 0.5*Fs;
 max_index = 2*Fs;
-
 
 [~, index] = max(signal_autocorrelation(min_index:max_index));
 true_index = index+min_index-1;
