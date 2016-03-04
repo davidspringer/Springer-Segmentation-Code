@@ -152,11 +152,19 @@ void viterbi(
                 
                 probs = 0;
                 for(i2 = start; i2<=end_t; i2++){
+                    
+                    // Ensure that the probabilities aren't zero leading to -inf probabilities after log:
+                    if(observation_probs[i2 +j*T] == 0){
+                        observation_probs[i2 +j*T] = FLT_MIN;
+                    }
+                    
                     probs = probs + log(observation_probs[i2 +j*T]);
                 }
-                if(probs == 0){
-                    probs = DBL_MIN;
+                
+                if(probs ==0){
+                    probs = FLT_MIN;
                 }
+
                 emission_probs = (probs);
                 
                 /*Find the total probability of transitioning from the last
