@@ -63,6 +63,7 @@ if(figures)
    plot(t1,normalise_signal(audio_data),'k');
    hold on;
    plot(t1,assigned_states,'r--');
+   xlabel('Time (s)');
    legend('Audio data', 'Derived states');
 end
 
